@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<odoo>
+
+    <record id="survey_survey_form_certificate" model="ir.ui.view">
+        <field name="name">survey.survey.form.certificate</field>
+        <field name="model">survey.survey</field>
+        <field name="inherit_id" ref="survey.survey_survey_view_form"/>
+        <field name="arch" type="xml">
+            <!-- Tambahkan field di bagian settings, setelah certification checkbox -->
+            <xpath expr="//field[@name='certification']" position="after">
+                <field name="certificate_template_id" 
+                       invisible="not certification"
+                       required="certification"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

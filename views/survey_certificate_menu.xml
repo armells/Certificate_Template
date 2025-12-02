@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<odoo>
+
+    <!-- Action -->
+    <record id="action_survey_certificate_template" model="ir.actions.act_window">
+        <field name="name">Certificate Templates</field>
+        <field name="res_model">survey.certificate.template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Parent Menu LANGSUNG ke action -->
+    <menuitem id="menu_survey_certificate_root"
+              name="Certificates"
+              parent="survey.menu_surveys"
+              action="survey_certificate_template.action_survey_certificate_template"
+              sequence="30"/>
+
+</odoo>
+
