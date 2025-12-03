@@ -10,5 +10,6 @@
         'views/survey_certificate_menu.xml',
         'views/certificate_template_views.xml',
         'views/survey_survey_views.xml',
+        'report/certification_report_template.xml',
     ],
 }

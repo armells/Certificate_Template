@@ -19,6 +19,25 @@ class SurveySurvey(models.Model):
 class SurveyUserInput(models.Model):
     _inherit = 'survey.user_input'
 
+    certification_report_image = fields.Binary(
+        string='Certification Report Image',
+        compute='_compute_certification_report_image',
+        store=False
+    )
+
+    @api.depends('survey_id.certificate_template_id', 'partner_id', 'email')
+    def _compute_certification_report_image(self):
+        """Compute certification report image"""
+        for record in self:
+            if record.survey_id.certificate_template_id:
+                _logger.info(f"=== Computing CUSTOM certificate for {record.partner_id.name or record.email} ===")
+                record.certification_report_image = record._generate_custom_certificate()
+            else:
+                try:
+                    super(SurveyUserInput, record)._compute_certification_report_image()
+                except:
+                    record.certification_report_image = False
+
     def _generate_custom_certificate(self):
         """Generate custom certificate with Pillow"""
         self.ensure_one()
@@ -29,13 +48,11 @@ class SurveyUserInput(models.Model):
             return False
         
         try:
-            _logger.info(f"=== GENERATING CUSTOM CERTIFICATE ===")
+            _logger.info(f"Generating custom certificate using template: {template.name}")
             
-            # Decode template
             template_data = base64.b64decode(template.file)
             img = Image.open(BytesIO(template_data))
             
-            # Convert mode
             if img.mode == 'RGBA':
                 background = Image.new('RGB', img.size, (255, 255, 255))
                 background.paste(img, mask=img.split()[3])
@@ -45,10 +62,8 @@ class SurveyUserInput(models.Model):
             
             draw = ImageDraw.Draw(img)
             
-            # Data peserta
             partner_name = self.partner_id.name if self.partner_id else self.email or "Participant"
             
-            # Font
             font_name = None
             font_date = None
             
@@ -69,10 +84,8 @@ class SurveyUserInput(models.Model):
                 font_name = ImageFont.load_default()
                 font_date = ImageFont.load_default()
             
-            # Posisi
             img_width, img_height = img.size
             
-            # Nama
             name_bbox = draw.textbbox((0, 0), partner_name, font=font_name)
             name_width = name_bbox[2] - name_bbox[0]
             name_x = (img_width - name_width) // 2
@@ -80,7 +93,6 @@ class SurveyUserInput(models.Model):
             
             draw.text((name_x, name_y), partner_name, fill='#000000', font=font_name)
             
-            # Tanggal
             completion_date = fields.Date.today().strftime("%B %d, %Y")
             date_bbox = draw.textbbox((0, 0), completion_date, font=font_date)
             date_width = date_bbox[2] - date_bbox[0]
@@ -89,23 +101,15 @@ class SurveyUserInput(models.Model):
             
             draw.text((date_x, date_y), completion_date, fill='#000000', font=font_date)
             
-            # Output
             output = BytesIO()
             img.save(output, format='PNG')
             output.seek(0)
             
-            return base64.b64encode(output.read())
+            result = base64.b64encode(output.read())
+            _logger.info("=== Custom certificate generated successfully! ===")
+            
+            return result
             
         except Exception as e:
             _logger.error(f"Error: {str(e)}", exc_info=True)
             return False
-
-    # Override semua method yang mungkin
-    @api.depends('survey_id.certificate_template_id', 'partner_id')
-    def _compute_certification_report_image(self):
-        """Override compute certification report image"""
-        for record in self:
-            if record.survey_id.certificate_template_id:
-                record.certification_report_image = record._generate_custom_certificate()
-            else:
-                super(SurveyUserInput, record)._compute_certification_report_image()
