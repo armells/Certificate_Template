@@ -15,6 +15,21 @@ class SurveySurvey(models.Model):
         help='Select certificate template for this survey'
     )
 
+    def action_survey_preview_certification_template(self):
+        """Override preview button to open in new tab without download"""
+        self.ensure_one()
+        
+        if self.certificate_template_id:
+            # Redirect to preview page (image in browser)
+            return {
+                'type': 'ir.actions.act_url',
+                'url': f'/survey/certificate/preview/{self.id}',
+                'target': 'new',
+            }
+        else:
+            # Use default preview
+            return super().action_survey_preview_certification_template()
+
 
 class SurveyUserInput(models.Model):
     _inherit = 'survey.user_input'

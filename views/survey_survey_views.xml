@@ -6,12 +6,19 @@
         <field name="model">survey.survey</field>
         <field name="inherit_id" ref="survey.survey_survey_view_form"/>
         <field name="arch" type="xml">
-            <!-- Tambahkan field di bagian settings, setelah certification checkbox -->
+            
+            <!-- Tambahkan field certificate_template_id setelah certification checkbox -->
             <xpath expr="//field[@name='certification']" position="after">
                 <field name="certificate_template_id" 
                        invisible="not certification"
                        required="certification"/>
             </xpath>
+            
+            <!-- SEMBUNYIKAN dropdown style default (certification_report_layout) -->
+            <xpath expr="//field[@name='certification_report_layout']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            
         </field>
     </record>
 
