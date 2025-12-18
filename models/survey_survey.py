@@ -20,14 +20,12 @@ class SurveySurvey(models.Model):
         self.ensure_one()
         
         if self.certificate_template_id:
-            # Redirect to preview page (image in browser)
             return {
                 'type': 'ir.actions.act_url',
                 'url': f'/survey/certificate/preview/{self.id}',
                 'target': 'new',
             }
         else:
-            # Use default preview
             return super().action_survey_preview_certification_template()
 
 
@@ -45,7 +43,7 @@ class SurveyUserInput(models.Model):
         """Compute certification report image"""
         for record in self:
             if record.survey_id.certificate_template_id:
-                _logger.info(f"=== Computing CUSTOM certificate for {record.partner_id.name or record.email} ===")
+                _logger.info(f"=== Computing CUSTOM certificate for user_input {record.id} ===")
                 record.certification_report_image = record._generate_custom_certificate()
             else:
                 try:
@@ -57,25 +55,54 @@ class SurveyUserInput(models.Model):
         """Get participant name from survey answers if available"""
         self.ensure_one()
         
+        _logger.info(f"=== Getting participant name for user_input {self.id} ===")
+        _logger.info(f"Survey: {self.survey_id.title}")
+        _logger.info(f"Total questions: {len(self.survey_id.question_ids)}")
+        _logger.info(f"Total answers: {len(self.user_input_line_ids)}")
+        
+        # Log all questions
+        for question in self.survey_id.question_ids:
+            _logger.info(f"Question ID {question.id}: '{question.title}' (type: {question.question_type})")
+        
+        # Log all answers
+        for answer in self.user_input_line_ids:
+            _logger.info(f"Answer for Q{answer.question_id.id}: value_text_box='{answer.value_text_box}', value_char_box='{answer.value_char_box}'")
+        
         # Cari question yang judulnya mengandung 'nama' atau 'name'
         name_questions = self.survey_id.question_ids.filtered(
             lambda q: 'nama' in q.title.lower() or 'name' in q.title.lower()
         )
         
+        _logger.info(f"Found {len(name_questions)} name-related questions")
+        
         if name_questions:
-            # Ambil answer untuk question pertama yang ketemu
             name_question = name_questions[0]
+            _logger.info(f"Using question: '{name_question.title}' (ID: {name_question.id})")
+            
+            # Cari answer untuk question ini
             answer = self.user_input_line_ids.filtered(
                 lambda line: line.question_id.id == name_question.id
             )
             
-            if answer and answer.value_text_box:
-                _logger.info(f"Found name from survey answer: {answer.value_text_box}")
-                return answer.value_text_box
+            _logger.info(f"Found {len(answer)} answers for this question")
+            
+            if answer:
+                # Cek berbagai field yang mungkin berisi jawaban
+                if answer.value_text_box:
+                    _logger.info(f"✓ Found name in value_text_box: '{answer.value_text_box}'")
+                    return answer.value_text_box
+                elif answer.value_char_box:
+                    _logger.info(f"✓ Found name in value_char_box: '{answer.value_char_box}'")
+                    return answer.value_char_box
+                elif hasattr(answer, 'value_text') and answer.value_text:
+                    _logger.info(f"✓ Found name in value_text: '{answer.value_text}'")
+                    return answer.value_text
+                else:
+                    _logger.warning(f"Answer found but no value in any field!")
         
         # Fallback ke partner name atau email
         fallback_name = self.partner_id.name if self.partner_id else self.email or "Participant"
-        _logger.info(f"Using fallback name: {fallback_name}")
+        _logger.info(f"Using fallback name: '{fallback_name}'")
         return fallback_name
 
     def _generate_custom_certificate(self):
@@ -111,16 +138,13 @@ class SurveyUserInput(models.Model):
                     logo_data = base64.b64decode(template.logo_image)
                     logo = Image.open(BytesIO(logo_data))
                     
-                    # Resize logo
                     logo_width = template.logo_width
                     logo_height = int(logo.height * (logo_width / logo.width))
                     logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
                     
-                    # Position logo
                     logo_x = int(img_width * (template.logo_position_x / 100))
                     logo_y = int(img_height * (template.logo_position_y / 100))
                     
-                    # Paste logo
                     if logo.mode == 'RGBA':
                         img.paste(logo, (logo_x, logo_y), logo)
                     else:
@@ -132,6 +156,7 @@ class SurveyUserInput(models.Model):
             
             # === TULIS NAMA - AMBIL DARI SURVEY ANSWER ===
             partner_name = self._get_participant_name_from_answers()
+            _logger.info(f">>> FINAL NAME TO PRINT: '{partner_name}' <<<")
             
             # Load font
             font_name = None
@@ -154,14 +179,14 @@ class SurveyUserInput(models.Model):
                 font_name = ImageFont.load_default()
                 font_date = ImageFont.load_default()
             
-            # Posisi nama (center horizontal, vertical sesuai setting)
+            # Posisi nama
             name_bbox = draw.textbbox((0, 0), partner_name, font=font_name)
             name_width = name_bbox[2] - name_bbox[0]
             name_x = (img_width - name_width) // 2
             name_y = int(img_height * (template.name_position_y / 100))
             
             draw.text((name_x, name_y), partner_name, fill=template.name_color, font=font_name)
-            _logger.info(f"Name '{partner_name}' added at ({name_x}, {name_y})")
+            _logger.info(f"Name '{partner_name}' printed at ({name_x}, {name_y})")
             
             # === TULIS TANGGAL ===
             if template.show_date:
@@ -180,22 +205,18 @@ class SurveyUserInput(models.Model):
                     sig_data = base64.b64decode(template.signature_image)
                     signature = Image.open(BytesIO(sig_data))
                     
-                    # Resize signature
                     sig_width = template.signature_width
                     sig_height = int(signature.height * (sig_width / signature.width))
                     signature = signature.resize((sig_width, sig_height), Image.Resampling.LANCZOS)
                     
-                    # Position signature
                     sig_x = int(img_width * (template.signature_position_x / 100)) - (sig_width // 2)
                     sig_y = int(img_height * (template.signature_position_y / 100))
                     
-                    # Paste signature
                     if signature.mode == 'RGBA':
                         img.paste(signature, (sig_x, sig_y), signature)
                     else:
                         img.paste(signature, (sig_x, sig_y))
                     
-                    # Tambahkan label signature
                     if template.signature_label:
                         label_bbox = draw.textbbox((0, 0), template.signature_label, font=font_date)
                         label_width = label_bbox[2] - label_bbox[0]
