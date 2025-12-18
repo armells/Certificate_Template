@@ -1,0 +1,605 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <template id="certificate_editor_page" name="Certificate Visual Editor">
+        <t t-call="web.layout">
+            <t t-set="head">
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"/>
+                <style>
+                    body {
+                        margin: 0;
+                        padding: 0;
+                        overflow: hidden;
+                    }
+                    .editor-container {
+                        display: flex;
+                        height: calc(100vh - 60px);
+                    }
+                    .canvas-wrapper {
+                        flex: 1;
+                        padding: 20px;
+                        overflow: auto;
+                        background: #f5f5f5;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                    }
+                    #certificate-canvas {
+                        border: 1px solid #ccc;
+                        background: white;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    }
+                    .toolbar {
+                        width: 320px;
+                        padding: 20px;
+                        background: white;
+                        border-left: 1px solid #ddd;
+                        overflow-y: auto;
+                    }
+                    .toolbar h4 {
+                        margin-top: 20px;
+                        margin-bottom: 15px;
+                        color: #333;
+                        font-size: 16px;
+                        border-bottom: 2px solid #875a7b;
+                        padding-bottom: 5px;
+                    }
+                    .toolbar h4:first-child {
+                        margin-top: 0;
+                    }
+                    .toolbar button {
+                        width: 100%;
+                        margin-bottom: 10px;
+                        padding: 10px;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                    }
+                    .toolbar button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                    }
+                    .property-group {
+                        margin-bottom: 15px;
+                    }
+                    .property-group label {
+                        display: block;
+                        margin-bottom: 5px;
+                        font-weight: bold;
+                        font-size: 12px;
+                        color: #555;
+                    }
+                    .property-group input,
+                    .property-group select {
+                        width: 100%;
+                        padding: 8px;
+                        border: 1px solid #ddd;
+                        border-radius: 4px;
+                        font-size: 14px;
+                    }
+                    .property-group input:focus,
+                    .property-group select:focus {
+                        outline: none;
+                        border-color: #875a7b;
+                    }
+                    .header-bar {
+                        background: #875a7b;
+                        color: white;
+                        padding: 15px 20px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    }
+                    .header-bar h2 {
+                        margin: 0;
+                        font-size: 20px;
+                    }
+                    .header-bar .btn {
+                        margin-left: 10px;
+                    }
+                    .text-muted {
+                        color: #999;
+                        font-style: italic;
+                    }
+                    hr {
+                        border: none;
+                        border-top: 1px solid #ddd;
+                        margin: 20px 0;
+                    }
+                </style>
+            </t>
+            
+            <div class="header-bar">
+                <h2>Certificate Editor: <t t-esc="template.name"/></h2>
+                <div>
+                    <button class="btn btn-success" onclick="saveLayout()">
+                        <i class="fa fa-save"></i> Save Layout
+                    </button>
+                    <a t-attf-href="/web#id={{template.id}}&amp;model=survey.certificate.template&amp;view_type=form" 
+                       class="btn btn-secondary">
+                        <i class="fa fa-times"></i> Close
+                    </a>
+                </div>
+            </div>
+            
+            <div class="editor-container">
+                <div class="canvas-wrapper">
+                    <canvas id="certificate-canvas"></canvas>
+                </div>
+                
+                <div class="toolbar">
+                    <h4><i class="fa fa-plus-circle"></i> Add Elements</h4>
+                    <button class="btn btn-primary" onclick="addNameText()">
+                        <i class="fa fa-user"></i> Add Name Field
+                    </button>
+                    <button class="btn btn-primary" onclick="addDateText()">
+                        <i class="fa fa-calendar"></i> Add Date Field
+                    </button>
+                    <button class="btn btn-info" onclick="addLogo()">
+                        <i class="fa fa-image"></i> Add Logo
+                    </button>
+                    <button class="btn btn-info" onclick="addSignature()">
+                        <i class="fa fa-pencil"></i> Add Signature
+                    </button>
+                    
+                    <hr/>
+                    
+                    <h4><i class="fa fa-cog"></i> Properties</h4>
+                    <div id="element-properties">
+                        <p class="text-muted">Select an element to edit its properties</p>
+                    </div>
+                    
+                    <hr/>
+                    
+                    <h4><i class="fa fa-trash"></i> Actions</h4>
+                    <button class="btn btn-danger" onclick="deleteSelected()">
+                        <i class="fa fa-trash"></i> Delete Selected
+                    </button>
+                    <button class="btn btn-warning" onclick="resetCanvas()">
+                        <i class="fa fa-refresh"></i> Reset Canvas
+                    </button>
+                </div>
+            </div>
+            
+            <script type="text/javascript">
+            <![CDATA[
+                var canvas;
+                var templateId = ]]><t t-esc="template.id"/><![CDATA[;
+                
+                document.addEventListener('DOMContentLoaded', function() {
+                    console.log('=== Certificate Editor Initializing ===');
+                    console.log('Template ID:', templateId);
+                    initEditor();
+                });
+                
+                function initEditor() {
+                    console.log('Initializing canvas...');
+                    canvas = new fabric.Canvas('certificate-canvas', {
+                        preserveObjectStacking: true,
+                        selection: true
+                    });
+                    
+                    loadBackground();
+                    
+                    canvas.on('selection:created', updateProperties);
+                    canvas.on('selection:updated', updateProperties);
+                    canvas.on('selection:cleared', clearProperties);
+                    
+                    setTimeout(function() {
+                        loadSavedLayout();
+                    }, 1000);
+                }
+                
+                function loadBackground() {
+                    var imageUrl = '/certificate/template/image/' + templateId;
+                    console.log('Loading image from:', imageUrl);
+                    
+                    fabric.Image.fromURL(imageUrl, function(img) {
+                        if (!img || !img.width) {
+                            console.error('Failed to load image');
+                            alert('Error loading certificate template image!');
+                            return;
+                        }
+                        
+                        console.log('Image loaded:', img.width, 'x', img.height);
+                        
+                        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                            scaleX: 1,
+                            scaleY: 1
+                        });
+                        
+                        canvas.setWidth(img.width);
+                        canvas.setHeight(img.height);
+                        canvas.renderAll();
+                    }, {
+                        crossOrigin: 'anonymous'
+                    });
+                }
+                
+                function addNameText() {
+                    var existing = canvas.getObjects().find(function(o) { return o.id === 'name'; });
+                    if (existing) {
+                        alert('Name field already exists!');
+                        canvas.setActiveObject(existing);
+                        canvas.renderAll();
+                        return;
+                    }
+                    
+                    var text = new fabric.IText('Participant Name', {
+                        left: canvas.width / 2 - 200,
+                        top: canvas.height * 0.45,
+                        fontSize: 60,
+                        fill: '#000000',
+                        fontFamily: 'Arial',
+                        fontWeight: 'bold',
+                        id: 'name'
+                    });
+                    
+                    canvas.add(text);
+                    canvas.setActiveObject(text);
+                    canvas.renderAll();
+                }
+                
+                function addDateText() {
+                    var existing = canvas.getObjects().find(function(o) { return o.id === 'date'; });
+                    if (existing) {
+                        alert('Date field already exists!');
+                        canvas.setActiveObject(existing);
+                        canvas.renderAll();
+                        return;
+                    }
+                    
+                    var text = new fabric.IText('December 17, 2025', {
+                        left: canvas.width / 2 - 150,
+                        top: canvas.height * 0.55,
+                        fontSize: 30,
+                        fill: '#000000',
+                        fontFamily: 'Arial',
+                        id: 'date'
+                    });
+                    
+                    canvas.add(text);
+                    canvas.setActiveObject(text);
+                    canvas.renderAll();
+                }
+                
+                function addLogo() {
+                    var existing = canvas.getObjects().find(function(o) { return o.id === 'logo'; });
+                    if (existing) {
+                        alert('Logo already exists!');
+                        canvas.setActiveObject(existing);
+                        canvas.renderAll();
+                        return;
+                    }
+                    
+                    var logoUrl = '/certificate/template/logo/' + templateId;
+                    
+                    fabric.Image.fromURL(logoUrl, function(img) {
+                        if (!img || !img.width) {
+                            alert('Please upload logo image first!');
+                            return;
+                        }
+                        
+                        img.scale(0.3);
+                        img.set({
+                            left: 50,
+                            top: 50,
+                            id: 'logo'
+                        });
+                        canvas.add(img);
+                        canvas.setActiveObject(img);
+                        canvas.renderAll();
+                    });
+                }
+                
+                function addSignature() {
+                    var existing = canvas.getObjects().find(function(o) { return o.id === 'signature'; });
+                    if (existing) {
+                        alert('Signature already exists!');
+                        canvas.setActiveObject(existing);
+                        canvas.renderAll();
+                        return;
+                    }
+                    
+                    var signatureUrl = '/certificate/template/signature/' + templateId;
+                    
+                    fabric.Image.fromURL(signatureUrl, function(img) {
+                        if (!img || !img.width) {
+                            alert('Please upload signature image first!');
+                            return;
+                        }
+                        
+                        img.scale(0.5);
+                        img.set({
+                            left: canvas.width / 2 - 100,
+                            top: canvas.height * 0.75,
+                            id: 'signature'
+                        });
+                        canvas.add(img);
+                        canvas.setActiveObject(img);
+                        canvas.renderAll();
+                    });
+                }
+                
+                function updateProperties() {
+                    var obj = canvas.getActiveObject();
+                    if (!obj) return;
+                    
+                    var propsDiv = document.getElementById('element-properties');
+                    propsDiv.innerHTML = '';
+                    
+                    var typeGroup = document.createElement('div');
+                    typeGroup.className = 'property-group';
+                    var typeLabel = document.createElement('label');
+                    typeLabel.textContent = 'Element Type:';
+                    typeGroup.appendChild(typeLabel);
+                    var typeInput = document.createElement('input');
+                    typeInput.type = 'text';
+                    typeInput.value = obj.id || 'unknown';
+                    typeInput.disabled = true;
+                    typeGroup.appendChild(typeInput);
+                    propsDiv.appendChild(typeGroup);
+                    
+                    if (obj.type === 'i-text') {
+                        var sizeGroup = document.createElement('div');
+                        sizeGroup.className = 'property-group';
+                        var sizeLabel = document.createElement('label');
+                        sizeLabel.textContent = 'Font Size:';
+                        sizeGroup.appendChild(sizeLabel);
+                        var sizeInput = document.createElement('input');
+                        sizeInput.type = 'number';
+                        sizeInput.value = obj.fontSize;
+                        sizeInput.onchange = function() { updateFontSize(this.value); };
+                        sizeGroup.appendChild(sizeInput);
+                        propsDiv.appendChild(sizeGroup);
+                        
+                        var colorGroup = document.createElement('div');
+                        colorGroup.className = 'property-group';
+                        var colorLabel = document.createElement('label');
+                        colorLabel.textContent = 'Text Color:';
+                        colorGroup.appendChild(colorLabel);
+                        var colorInput = document.createElement('input');
+                        colorInput.type = 'color';
+                        colorInput.value = obj.fill;
+                        colorInput.onchange = function() { updateColor(this.value); };
+                        colorGroup.appendChild(colorInput);
+                        propsDiv.appendChild(colorGroup);
+                        
+                        var fontGroup = document.createElement('div');
+                        fontGroup.className = 'property-group';
+                        var fontLabel = document.createElement('label');
+                        fontLabel.textContent = 'Font Family:';
+                        fontGroup.appendChild(fontLabel);
+                        var fontSelect = document.createElement('select');
+                        fontSelect.onchange = function() { updateFont(this.value); };
+                        
+                        var fonts = ['Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+                        for (var i = 0; i < fonts.length; i++) {
+                            var option = document.createElement('option');
+                            option.value = fonts[i];
+                            option.text = fonts[i];
+                            if (obj.fontFamily === fonts[i]) {
+                                option.selected = true;
+                            }
+                            fontSelect.appendChild(option);
+                        }
+                        
+                        fontGroup.appendChild(fontSelect);
+                        propsDiv.appendChild(fontGroup);
+                        
+                        var weightGroup = document.createElement('div');
+                        weightGroup.className = 'property-group';
+                        var weightLabel = document.createElement('label');
+                        weightLabel.textContent = 'Font Weight:';
+                        weightGroup.appendChild(weightLabel);
+                        var weightSelect = document.createElement('select');
+                        weightSelect.onchange = function() { updateFontWeight(this.value); };
+                        
+                        var weights = ['normal', 'bold'];
+                        for (var j = 0; j < weights.length; j++) {
+                            var wOption = document.createElement('option');
+                            wOption.value = weights[j];
+                            wOption.text = weights[j];
+                            if (obj.fontWeight === weights[j]) {
+                                wOption.selected = true;
+                            }
+                            weightSelect.appendChild(wOption);
+                        }
+                        
+                        weightGroup.appendChild(weightSelect);
+                        propsDiv.appendChild(weightGroup);
+                    }
+                }
+                
+                function clearProperties() {
+                    document.getElementById('element-properties').innerHTML = '<p class="text-muted">Select an element to edit its properties</p>';
+                }
+                
+                function updateFontSize(size) {
+                    var obj = canvas.getActiveObject();
+                    if (obj) {
+                        obj.set('fontSize', parseInt(size));
+                        canvas.renderAll();
+                    }
+                }
+                
+                function updateColor(color) {
+                    var obj = canvas.getActiveObject();
+                    if (obj) {
+                        obj.set('fill', color);
+                        canvas.renderAll();
+                    }
+                }
+                
+                function updateFont(font) {
+                    var obj = canvas.getActiveObject();
+                    if (obj) {
+                        obj.set('fontFamily', font);
+                        canvas.renderAll();
+                    }
+                }
+                
+                function updateFontWeight(weight) {
+                    var obj = canvas.getActiveObject();
+                    if (obj) {
+                        obj.set('fontWeight', weight);
+                        canvas.renderAll();
+                    }
+                }
+                
+                function deleteSelected() {
+                    var obj = canvas.getActiveObject();
+                    if (obj) {
+                        if (confirm('Delete this element?')) {
+                            canvas.remove(obj);
+                            clearProperties();
+                            canvas.renderAll();
+                        }
+                    } else {
+                        alert('Please select an element first!');
+                    }
+                }
+                
+                function resetCanvas() {
+                    if (confirm('Reset canvas?')) {
+                        var objects = canvas.getObjects();
+                        for (var i = objects.length - 1; i >= 0; i--) {
+                            canvas.remove(objects[i]);
+                        }
+                        clearProperties();
+                        canvas.renderAll();
+                    }
+                }
+                
+                function saveLayout() {
+                    var layout = {
+                        canvas_width: canvas.width,
+                        canvas_height: canvas.height,
+                        objects: []
+                    };
+                    
+                    canvas.getObjects().forEach(function(obj) {
+                        if (obj.id) {
+                            var objData = {
+                                id: obj.id,
+                                left: obj.left,
+                                top: obj.top,
+                                width: obj.width * (obj.scaleX || 1),
+                                height: obj.height * (obj.scaleY || 1)
+                            };
+                            
+                            if (obj.type === 'i-text') {
+                                objData.fontSize = obj.fontSize;
+                                objData.fill = obj.fill;
+                                objData.fontFamily = obj.fontFamily;
+                                objData.fontWeight = obj.fontWeight;
+                            }
+                            
+                            layout.objects.push(objData);
+                        }
+                    });
+                    
+                    fetch('/certificate/editor/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            jsonrpc: '2.0',
+                            method: 'call',
+                            params: {
+                                template_id: templateId,
+                                layout: layout
+                            }
+                        })
+                    })
+                    .then(function(response) { return response.json(); })
+                    .then(function(data) {
+                        if (data.result && data.result.success) {
+                            alert('Layout saved successfully!');
+                        } else {
+                            alert('Error: ' + (data.result ? data.result.error : 'Unknown error'));
+                        }
+                    })
+                    .catch(function(error) {
+                        alert('Error saving: ' + error);
+                    });
+                }
+                
+                function loadSavedLayout() {
+                    fetch('/certificate/editor/load/' + templateId, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            jsonrpc: '2.0',
+                            method: 'call',
+                            params: {}
+                        })
+                    })
+                    .then(function(response) { return response.json(); })
+                    .then(function(data) {
+                        if (data.result && data.result.success && data.result.layout) {
+                            var layout = data.result.layout;
+                            
+                            layout.objects.forEach(function(objData) {
+                                if (objData.id === 'name' || objData.id === 'date') {
+                                    var text = new fabric.IText(objData.id === 'name' ? 'Participant Name' : 'December 17, 2025', {
+                                        left: objData.left,
+                                        top: objData.top,
+                                        fontSize: objData.fontSize,
+                                        fill: objData.fill,
+                                        fontFamily: objData.fontFamily,
+                                        fontWeight: objData.fontWeight || 'normal',
+                                        id: objData.id
+                                    });
+                                    canvas.add(text);
+                                } else if (objData.id === 'logo') {
+                                    var logoUrl = '/certificate/template/logo/' + templateId;
+                                    fabric.Image.fromURL(logoUrl, function(img) {
+                                        if (img && img.width) {
+                                            img.set({
+                                                left: objData.left,
+                                                top: objData.top,
+                                                scaleX: objData.width / img.width,
+                                                scaleY: objData.height / img.height,
+                                                id: 'logo'
+                                            });
+                                            canvas.add(img);
+                                            canvas.renderAll();
+                                        }
+                                    });
+                                } else if (objData.id === 'signature') {
+                                    var signatureUrl = '/certificate/template/signature/' + templateId;
+                                    fabric.Image.fromURL(signatureUrl, function(img) {
+                                        if (img && img.width) {
+                                            img.set({
+                                                left: objData.left,
+                                                top: objData.top,
+                                                scaleX: objData.width / img.width,
+                                                scaleY: objData.height / img.height,
+                                                id: 'signature'
+                                            });
+                                            canvas.add(img);
+                                            canvas.renderAll();
+                                        }
+                                    });
+                                }
+                            });
+                            
+                            canvas.renderAll();
+                        }
+                    })
+                    .catch(function(error) {
+                        console.error('Load error:', error);
+                    });
+                }
+            ]]>
+            </script>
+        </t>
+    </template>
+    
+</odoo>

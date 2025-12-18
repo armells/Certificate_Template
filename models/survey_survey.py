@@ -53,6 +53,31 @@ class SurveyUserInput(models.Model):
                 except:
                     record.certification_report_image = False
 
+    def _get_participant_name_from_answers(self):
+        """Get participant name from survey answers if available"""
+        self.ensure_one()
+        
+        # Cari question yang judulnya mengandung 'nama' atau 'name'
+        name_questions = self.survey_id.question_ids.filtered(
+            lambda q: 'nama' in q.title.lower() or 'name' in q.title.lower()
+        )
+        
+        if name_questions:
+            # Ambil answer untuk question pertama yang ketemu
+            name_question = name_questions[0]
+            answer = self.user_input_line_ids.filtered(
+                lambda line: line.question_id.id == name_question.id
+            )
+            
+            if answer and answer.value_text_box:
+                _logger.info(f"Found name from survey answer: {answer.value_text_box}")
+                return answer.value_text_box
+        
+        # Fallback ke partner name atau email
+        fallback_name = self.partner_id.name if self.partner_id else self.email or "Participant"
+        _logger.info(f"Using fallback name: {fallback_name}")
+        return fallback_name
+
     def _generate_custom_certificate(self):
         """Generate custom certificate with configurable positions"""
         self.ensure_one()
@@ -105,8 +130,8 @@ class SurveyUserInput(models.Model):
                 except Exception as e:
                     _logger.error(f"Error adding logo: {e}")
             
-            # === TULIS NAMA ===
-            partner_name = self.partner_id.name if self.partner_id else self.email or "Participant"
+            # === TULIS NAMA - AMBIL DARI SURVEY ANSWER ===
+            partner_name = self._get_participant_name_from_answers()
             
             # Load font
             font_name = None

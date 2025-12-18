@@ -18,72 +18,116 @@
         <field name="model">survey.certificate.template</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <!-- BUTTON VISUAL EDITOR -->
+                    <button name="action_open_visual_editor" 
+                            string="Open Visual Editor" 
+                            type="object" 
+                            class="btn-primary"
+                            icon="fa-paint-brush"
+                            invisible="not file"/>
+                </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_visual_editor" 
+                                type="object" 
+                                class="oe_stat_button" 
+                                icon="fa-edit"
+                                invisible="not file">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Visual</span>
+                                <span class="o_stat_text">Editor</span>
+                            </div>
+                        </button>
+                    </div>
+                    
                     <group>
                         <group>
                             <field name="name"/>
-                            <field name="file" filename="filename"/>
+                            <field name="file" filename="filename" widget="binary"/>
                             <field name="filename" invisible="1"/>
                             <field name="active"/>
                         </group>
                     </group>
                     
+                    <!-- Field layout_json disembunyikan -->
+                    <field name="layout_json" invisible="1"/>
+                    
                     <notebook>
-                        <!-- Tab: Name Settings -->
-                        <page string="Name Settings">
+                        <!-- Tab 1: Name Settings -->
+                        <page string="Name Settings" name="name_settings">
                             <group>
-                                <group>
+                                <group string="Position">
                                     <field name="name_position_y"/>
-                                    <field name="name_font_size"/>
                                 </group>
-                                <group>
+                                <group string="Style">
+                                    <field name="name_font_size"/>
                                     <field name="name_color" widget="color"/>
                                 </group>
                             </group>
                         </page>
                         
-                        <!-- Tab: Date Settings -->
-                        <page string="Date Settings">
+                        <!-- Tab 2: Date Settings -->
+                        <page string="Date Settings" name="date_settings">
                             <group>
-                                <group>
+                                <group string="Visibility">
                                     <field name="show_date"/>
-                                    <field name="date_position_offset" invisible="not show_date"/>
-                                    <field name="date_font_size" invisible="not show_date"/>
                                 </group>
-                                <group>
-                                    <field name="date_color" widget="color" invisible="not show_date"/>
+                            </group>
+                            <group invisible="not show_date">
+                                <group string="Position">
+                                    <field name="date_position_offset"/>
+                                </group>
+                                <group string="Style">
+                                    <field name="date_font_size"/>
+                                    <field name="date_color" widget="color"/>
                                 </group>
                             </group>
                         </page>
                         
-                        <!-- Tab: Logo Settings -->
-                        <page string="Logo Settings">
+                        <!-- Tab 3: Logo Settings -->
+                        <page string="Logo Settings" name="logo_settings">
                             <group>
-                                <group>
+                                <group string="Visibility">
                                     <field name="show_logo"/>
-                                    <field name="logo_image" widget="image" invisible="not show_logo"/>
-                                    <field name="logo_width" invisible="not show_logo"/>
                                 </group>
-                                <group>
-                                    <field name="logo_position_x" invisible="not show_logo"/>
-                                    <field name="logo_position_y" invisible="not show_logo"/>
+                            </group>
+                            <group invisible="not show_logo">
+                                <group string="Logo Image">
+                                    <field name="logo_image" widget="image" options="{'size': [200, 200]}"/>
+                                    <field name="logo_width"/>
+                                </group>
+                                <group string="Position">
+                                    <field name="logo_position_x"/>
+                                    <field name="logo_position_y"/>
                                 </group>
                             </group>
                         </page>
                         
-                        <!-- Tab: Signature Settings -->
-                        <page string="Signature Settings">
+                        <!-- Tab 4: Signature Settings -->
+                        <page string="Signature Settings" name="signature_settings">
                             <group>
-                                <group>
+                                <group string="Visibility">
                                     <field name="show_signature"/>
-                                    <field name="signature_image" widget="image" invisible="not show_signature"/>
-                                    <field name="signature_width" invisible="not show_signature"/>
-                                    <field name="signature_label" invisible="not show_signature"/>
                                 </group>
-                                <group>
-                                    <field name="signature_position_x" invisible="not show_signature"/>
-                                    <field name="signature_position_y" invisible="not show_signature"/>
+                            </group>
+                            <group invisible="not show_signature">
+                                <group string="Signature Image">
+                                    <field name="signature_image" widget="image" options="{'size': [200, 200]}"/>
+                                    <field name="signature_width"/>
+                                    <field name="signature_label"/>
                                 </group>
+                                <group string="Position">
+                                    <field name="signature_position_x"/>
+                                    <field name="signature_position_y"/>
+                                </group>
+                            </group>
+                        </page>
+                        
+                        <!-- Tab 5: Advanced (JSON Config) -->
+                        <page string="Advanced" name="advanced" groups="base.group_no_one">
+                            <group>
+                                <field name="layout_json" widget="text"/>
                             </group>
                         </page>
                     </notebook>

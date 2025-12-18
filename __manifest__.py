@@ -4,12 +4,16 @@
     'summary': 'Addons upload/replace/delete template sertifikat',
     'author': 'rafi',
     'license': 'LGPL-3',
-    'depends': ['survey'],
+    'depends': ['survey','website'],
     'data': [
         'security/ir.model.access.csv',
         'views/survey_certificate_menu.xml',
         'views/certificate_template_views.xml',
         'views/survey_survey_views.xml',
+        'views/certificate_editor_template.xml',
         'report/certification_report_template.xml',
     ],
+    'installable': True,
+    'application': False,
+    'auto_install': False,
 }
